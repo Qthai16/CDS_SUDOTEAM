@@ -11,7 +11,7 @@
 
 bool STREAM = true;
 
-VideoCapture capture("video.avi");
+VideoCapture capture("/home/qthai/1_CuocDuaSo/3_pre_process/test_bongcay.mp4");
 DetectLane *detect;
 CarControl *car;
 int skipFrame = 1;
@@ -70,7 +70,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
             cnt = 0;
             curve =0;
             flag =2;
-            veloc = 60;
+            veloc = 40;
             if (DetectLane::variance>6){
                 cnt = 130;
             }
@@ -97,7 +97,8 @@ void videoProcess()
         
         imshow("View", src);
         detect->update(src);
-        waitKey(30);
+        if (waitKey(30) == 27)
+            break;
     }
 }
 

@@ -10,8 +10,8 @@ std_msgs::Float32 sign_pub;
 ros::Publisher sent_sign;
 /************************************************************************/
 float *output;
-char *cfgfile = "/home/vhop/CuocDuaSo/src/ROS_Package_example/lane_detect/darknet_wrapper/darknet/yolo-obj.cfg";
-char *weight = "/home/vhop/CuocDuaSo/src/ROS_Package_example/lane_detect/darknet_wrapper/darknet/traffic_sign_board_v2.weights";
+char *cfgfile = "/home/qthai/1_CuocDuaSo/src/lane_detect/darknet_wrapper/darknet/yolo-obj.cfg";
+char *weight = "/home/qthai/1_CuocDuaSo/src/lane_detect/darknet_wrapper/darknet/traffic_sign_board_v2.weights";
 float thresh = 0.4;
 int hits;
 box **outboxes = new box *;

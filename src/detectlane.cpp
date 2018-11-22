@@ -83,19 +83,20 @@ Mat DetectLane::preProcess(const Mat &src, Point& mass_road)
 {
     Mat imgThresholded, imgHSV, imgsobel, dst;
 
-    cvtColor(src, imgHSV, COLOR_BGR2HSV);
+    // cvtColor(src, imgHSV, COLOR_BGR2HSV);
 
-    inRange(imgHSV, Scalar(minThreshold[0], minThreshold[1], minThreshold[2]), 
-        Scalar(maxThreshold[0], maxThreshold[1], maxThreshold[2]), imgThresholded);
+    // inRange(imgHSV, Scalar(minThreshold[0], minThreshold[1], minThreshold[2]), 
+    //     Scalar(maxThreshold[0], maxThreshold[1], maxThreshold[2]), imgThresholded);
 
-    imgsobel = sobelfilter( imgThresholded );
-    mass_road = MassOfRoad( src );
-
-    dst = birdViewTranform( imgsobel, mass_road );
+    // imgsobel = sobelfilter( imgThresholded );
+    Mat drawing_contours = MassOfRoad( src, mass_road);
+    dst = birdViewTranform( drawing_contours, mass_road);
+    // mass_road = MassOfRoad( src );
+    // dst = birdViewTranform( imgsobel, mass_road );
     fillLane(dst);
 
     imshow("Bird View", dst);
-    imshow("Binary", imgThresholded);
+    // imshow("Binary", imgThresholded);
 
     return dst;
 }
@@ -388,7 +389,7 @@ bool DetectLane::point_in_rect( Rect rect_win, Point p)
     in_rect = in_rect & ( p.y <= y_max );
     return in_rect;
 }
-Mat DetectLane::birdViewTranform( const Mat &src, Point& mass_road)
+Mat DetectLane::birdViewTranform( const Mat &src, Point& mass_road_birdview)
 {
     Point2f src_vertices[4];
     Mat dst(BIRDVIEW_HEIGHT, BIRDVIEW_WIDTH, CV_8UC3);
@@ -411,13 +412,13 @@ Mat DetectLane::birdViewTranform( const Mat &src, Point& mass_road)
     warpPerspective(src, dst, M, dst.size(), INTER_LINEAR, BORDER_CONSTANT);
     // tranform massroad
     vector<Point2f> dstPoints, srcPoints;
-    srcPoints.push_back( Point2f( mass_road ) );
+    srcPoints.push_back( Point2f( mass_road_birdview ) );
     perspectiveTransform( srcPoints, dstPoints, M );
-    mass_road = Point( dstPoints.at(0).x, dstPoints.at(0).y - skyLine );
+    mass_road_birdview = Point( dstPoints.at(0).x, dstPoints.at(0).y - skyLine );
     return dst;
 }
 
-Point DetectLane::MassOfRoad(const Mat &src_RGB)
+Mat DetectLane::MassOfRoad(const Mat &src_RGB, Point &mass_road)
 {
     Scalar HSV_thresh_min = Scalar(0,1,101);
     Scalar HSV_thresh_max = Scalar(255,255,255);
@@ -432,6 +433,11 @@ Point DetectLane::MassOfRoad(const Mat &src_RGB)
     roi.height = src_RGB.size().height - offset_y;
     Mat src_crop = src_RGB(roi);
 
+    vector<Point> max_contours;
+    double max_area = 0;
+    int max_index = 0;
+    // Vec4i max_hierarchy = Vec4i(0, 0, 0, 0);
+
     cvtColor(src_crop, src_HSV, COLOR_BGR2HSV);
     inRange(src_HSV, HSV_thresh_min, HSV_thresh_max, road_thresh);
     bitwise_not(road_thresh,road_thresh_inv);
@@ -443,24 +449,7 @@ Point DetectLane::MassOfRoad(const Mat &src_RGB)
     vector<Vec4i> hierarchy;
     findContours( thresh_fullSize, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
 
-    Point mc_hsv = detectMassRoad( contours );
-
-    Mat drawing = Mat::zeros( thresh_fullSize.size(), CV_8UC3 );
-    for( int i = 0; i< contours.size(); i++ )
-    {
-       drawContours( drawing, contours, i, Scalar( 0, 255, 0), 2, 8, hierarchy, 0, Point() );
-       circle( drawing, mc_hsv, 1, Scalar (0,50,128), -1, 8, 0 );
-    }
-    imshow("Debug", drawing);
-    return mc_hsv;
-}
-
-Point DetectLane::detectMassRoad( vector<vector<Point>>& contours )
-{
-    vector<Point> max_contours;
-    double max_area = 0;
-    int max_index = 0;
-    for ( size_t i = 0 ; i < contours.size() ; i++ )\
+    for ( size_t i = 0 ; i < contours.size() ; i++ )
     {
         double area = fabs( contourArea( contours[i] ) );
         if (  area > max_area )
@@ -470,6 +459,39 @@ Point DetectLane::detectMassRoad( vector<vector<Point>>& contours )
             max_contours = contours[max_index];
         }
     }
+
     Moments mu = moments( max_contours, false );
-    return Point( mu.m10/mu.m00 , mu.m01/mu.m00 );
+    mass_road = Point( mu.m10/mu.m00 , mu.m01/mu.m00 );
+    
+    vector<Point> approx;
+
+    Mat drawing = Mat::zeros( thresh_fullSize.size(), CV_8UC1 );
+    Mat drawing_2 = drawing.clone();
+    // approxPolyDP(max_contours, approx, arcLength(max_contours, true)*0.01, true);
+    drawShapes(drawing_2, max_contours);
+
+    // const Point* ppt[1] = {max_contours.begin()};
+
+    // polylines(drawing, ppt, max_contours.size(), 1, true, Scalar(255,255,255), 5, 8);
+
+    // drawing = cvApproxPoly(max_contours, max_area, contours, CV_POLY_APPROX_DP, cvContourPerimeter(contours)*0.02, 0);
+    // for( int i = 0; i< contours.size(); i++ )
+    // {
+        // drawContours( drawing, contours, i, Scalar( 255), 2, 8, hierarchy, 0, Point() );
+        // circle( drawing, mass_road, 1, Scalar (255), -1, 8, 0 );
+    // }
+    // imshow("bug hoai", drawing);
+    // imshow("thresh_fullSize", thresh_fullSize);
+    imshow("single contour", drawing_2);
+
+    return drawing_2;
+}
+
+void DetectLane::drawShapes( Mat& image, const vector<Point> & Shapes)
+{
+    int n_point = Shapes.size();
+    const Point* a = &Shapes.at(0);
+
+    // cout << Shapes.size() <<endl;
+    polylines(image, &a, &n_point, 1, true, Scalar(255), 5, FILLED );
 }
